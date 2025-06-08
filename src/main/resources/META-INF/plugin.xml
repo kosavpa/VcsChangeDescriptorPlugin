@@ -1,0 +1,17 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <id>owl.home.ChangeDescriptor</id>
+    <name>ChangeDescriptor</name>
+    <vendor email="kosavpa@yandex.ru"/>
+    <depends>com.intellij.modules.platform</depends>
+    <extensions defaultExtensionNs="com.intellij"/>
+    <actions>
+        <action
+                class="owl.home.changedescriptor.CreateChangesInfo"
+                id="CreateChangesInfo"
+                text="Сгенерировать"
+                description="Сгенерировать коммит сообщение">
+            <add-to-group group-id="ChangesViewToolbar"/>
+        </action>
+    </actions>
+</idea-plugin>
