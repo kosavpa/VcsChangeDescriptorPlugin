@@ -5,6 +5,8 @@
     <vendor email="kosavpa@yandex.ru"/>
     <depends>com.intellij.modules.platform</depends>
     <extensions defaultExtensionNs="com.intellij"/>
+    <vendor>Kosolapov Saveliy</vendor>
+    <description>Simple plugin for create commit message from changes files</description>
     <actions>
         <action
                 class="owl.home.changedescriptor.CreateChangesInfo"
