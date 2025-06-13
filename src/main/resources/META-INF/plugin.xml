@@ -12,6 +12,7 @@
                 class="owl.home.changedescriptor.CreateChangesInfo"
                 id="CreateChangesInfo"
                 text="Сгенерировать"
+                icon="/icons/message_buttom.svg"
                 description="Сгенерировать коммит сообщение">
             <add-to-group group-id="ChangesViewToolbar"/>
         </action>
