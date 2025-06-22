@@ -8,7 +8,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.vcs.CheckinProjectPanel
-import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vcs.ui.Refreshable
@@ -59,8 +58,6 @@ class CreateChangesInfo : AnAction() {
                 .orEmpty()
 
             vcsPanel.commitMessage = buildCommitMessage(branchName, approvedFiles)
-
-            VcsDataKeys.SELECTED_CHANGES.getData(e.dataContext)
 
             logger.info("Commit message written")
         } else {
