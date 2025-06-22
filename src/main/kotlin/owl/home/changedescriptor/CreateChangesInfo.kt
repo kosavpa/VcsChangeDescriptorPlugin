@@ -13,6 +13,7 @@ import com.intellij.openapi.vcs.ui.Refreshable
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.dsl.builder.Cell
 import com.intellij.ui.dsl.builder.panel
+import git4idea.branch.GitBranchUtil
 
 
 class CreateChangesInfo : AnAction() {
@@ -25,10 +26,9 @@ class CreateChangesInfo : AnAction() {
 
         val vcsPanel = e.dataContext.getData(Refreshable.PANEL_KEY) as? CheckinProjectPanel ?: return
 
-        val changeList = (ChangeListManager
+        val changeList = ChangeListManager
             .getInstance(project)
-            .getChangeList(project.projectFile ?: return)
-            ?: return).changes ?: return
+            .allChanges
 
         logger.info("change list size:${changeList.size}")
 
@@ -41,19 +41,32 @@ class CreateChangesInfo : AnAction() {
         val dialog = ApproveCommitMessageTextDialog(fileNameToMap.keys, project)
 
         if (dialog.showAndGet()) {
-            vcsPanel.commitMessage = dialog.getApprovedFileNames()
-                .asSequence()
-                .map { fileNameToMap[it] }
-                .groupBy { it?.type?.name }
-                .map { entry ->
-                    "[%s]:\n%s".format(
-                        entry.key,
-                        entry.value
-                            .map { it?.virtualFile?.name }
-                            .fold("\t* ") { acc, s -> acc.plus(s).plus("\n\t ") }
-                    )
-                }
-                .reduce { acc, s -> acc.plus("\n").plus(s) }
+            val stringBuilder = StringBuilder()
+
+            stringBuilder
+                .append(
+                    GitBranchUtil.guessWidgetRepository(project, e.dataContext)
+                        ?.currentBranch
+                        ?.name
+                )
+                .append("\n\n")
+                .append(
+                    dialog.getApprovedFileNames()
+                        .asSequence()
+                        .map { fileNameToMap[it] }
+                        .groupBy { it?.type?.name }
+                        .map { entry ->
+                            "[%s]:%s".format(
+                                entry.key,
+                                entry.value
+                                    .map { it?.virtualFile?.name }
+                                    .joinToString("\n\t* ", "\n\t* ")
+                            )
+                        }
+                        .reduce { acc, s -> acc.plus("\n").plus(s) }
+                )
+
+            vcsPanel.commitMessage = stringBuilder.toString()
 
             logger.info("commit message written")
         } else {

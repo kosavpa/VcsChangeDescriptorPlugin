@@ -17,4 +17,5 @@
             <add-to-group group-id="ChangesViewToolbar"/>
         </action>
     </actions>
+    <depends>Git4Idea</depends>
 </idea-plugin>

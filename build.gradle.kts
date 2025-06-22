@@ -5,19 +5,16 @@ plugins {
 }
 
 group = "owl.home"
-version = "1.0-SNAPSHOT"
+version = "2.0"
 
 repositories {
   mavenCentral()
 }
 
-// Configure Gradle IntelliJ Plugin
-// Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
 intellij {
-  version.set("2024.3")
-  type.set("IC") // Target IDE Platform
-
-  plugins.set(listOf(/* Plugin Dependencies */))
+  version.set("2023.3")
+  type.set("IC")
+  plugins.set(listOf("Git4Idea"))
 }
 
 tasks {
