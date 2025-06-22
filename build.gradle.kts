@@ -29,6 +29,7 @@ tasks {
 
   patchPluginXml {
     sinceBuild.set("231")
+    untilBuild = provider { null }
   }
 
   signPlugin {
