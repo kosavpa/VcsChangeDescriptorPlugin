@@ -11,9 +11,9 @@
         <action
                 class="owl.home.changedescriptor.CreateChangesInfo"
                 id="CreateChangesInfo"
-                text="Сгенерировать"
+                text="Generate"
                 icon="/icons/message_buttom.svg"
-                description="Сгенерировать коммит сообщение">
+                description="Generate commit message from changes files names">
             <add-to-group group-id="ChangesViewToolbar"/>
         </action>
     </actions>
