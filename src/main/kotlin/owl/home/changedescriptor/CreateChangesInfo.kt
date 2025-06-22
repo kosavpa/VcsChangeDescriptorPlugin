@@ -8,6 +8,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.vcs.CheckinProjectPanel
+import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vcs.ui.Refreshable
 import com.intellij.ui.components.JBCheckBox
@@ -20,60 +21,76 @@ class CreateChangesInfo : AnAction() {
     private val logger = Logger.getInstance(CreateChangesInfo::class.java)
 
     override fun actionPerformed(e: AnActionEvent) {
-        logger.info("start creating commit info")
+        logger.info("Start creating commit info")
 
-        val project = e.project ?: return
+        val project = e.project ?: run {
+            logger.warn("No project found")
+            return
+        }
 
-        val vcsPanel = e.dataContext.getData(Refreshable.PANEL_KEY) as? CheckinProjectPanel ?: return
+        val vcsPanel = e.dataContext.getData(Refreshable.PANEL_KEY) as? CheckinProjectPanel ?: run {
+            logger.warn("No check-in panel found")
+            return
+        }
 
-        val changeList = ChangeListManager
-            .getInstance(project)
-            .allChanges
+        val changes = ChangeListManager.getInstance(project).allChanges
 
-        logger.info("change list size:${changeList.size}")
+        logger.info("Change list size: ${changes.size}")
 
-        val fileNameToMap = changeList
-            .filter { it.virtualFile?.name != null }
+        val fileNameToChangeMap = changes
+            .filterNotNullVirtualFile()
             .associateBy { it.virtualFile!!.name }
 
-        logger.info("changed files:${fileNameToMap.keys}")
+        if (fileNameToChangeMap.isEmpty()) {
+            logger.info("No files to commit")
 
-        val dialog = ApproveCommitMessageTextDialog(fileNameToMap.keys, project)
+            return
+        }
+
+        val dialog = ApproveCommitMessageTextDialog(fileNameToChangeMap.keys, project)
 
         if (dialog.showAndGet()) {
-            val stringBuilder = StringBuilder()
+            val approvedFiles = dialog.getApprovedFileNames().mapNotNull { fileNameToChangeMap[it] }
 
-            stringBuilder
-                .append(
-                    GitBranchUtil.guessWidgetRepository(project, e.dataContext)
-                        ?.currentBranch
-                        ?.name
-                )
-                .append("\n\n")
-                .append(
-                    dialog.getApprovedFileNames()
-                        .asSequence()
-                        .map { fileNameToMap[it] }
-                        .groupBy { it?.type?.name }
-                        .map { entry ->
-                            "[%s]:%s".format(
-                                entry.key,
-                                entry.value
-                                    .map { it?.virtualFile?.name }
-                                    .joinToString("\n\t* ", "\n\t* ")
-                            )
-                        }
-                        .reduce { acc, s -> acc.plus("\n").plus(s) }
-                )
+            val branchName = GitBranchUtil.guessWidgetRepository(project, e.dataContext)
+                ?.currentBranch
+                ?.name
+                .orEmpty()
 
-            vcsPanel.commitMessage = stringBuilder.toString()
+            vcsPanel.commitMessage = buildCommitMessage(branchName, approvedFiles)
 
-            logger.info("commit message written")
+            logger.info("Commit message written")
         } else {
-            logger.info("dialog closed without confirm")
+            logger.info("Dialog closed without confirmation")
         }
     }
 
+    private fun Collection<Change>.filterNotNullVirtualFile(): List<Change> = filter { it.virtualFile != null }
+
+    private fun buildCommitMessage(branchName: String, changes: List<Change>): String {
+        val groupedChanges = changes.groupBy { it.type }
+
+        return buildString {
+            appendLine(branchName)
+            groupedChanges.forEach { (type, files) ->
+                appendLine("[${getProjectTypeByVcsType(type)}]:")
+                files.forEach { file ->
+                    appendLine("* ${file.virtualFile?.name}: /*Впишите сюда что именно изменилось*/")
+                }
+            }
+        }
+    }
+
+    private fun getProjectTypeByVcsType(type: Change.Type): String {
+        return when (type) {
+            Change.Type.MOVED,
+            Change.Type.MODIFICATION -> "edit"
+
+            Change.Type.NEW -> "new"
+            Change.Type.DELETED -> "delete"
+            else -> "unknown"
+        }
+    }
 
     internal class ApproveCommitMessageTextDialog(private val commitFileNames: Set<String>, project: Project) :
         DialogWrapper(project) {
@@ -82,11 +99,13 @@ class CreateChangesInfo : AnAction() {
         init {
             isResizable = true
 
+            title = "Снимите галочки с файлов, имена которых не попадут в сообщение коммита"
+
             init()
 
             setOKButtonText("Ок")
-            setCancelButtonText("Отмена")
 
+            setCancelButtonText("Отмена")
         }
 
         fun getApprovedFileNames(): List<String> {
