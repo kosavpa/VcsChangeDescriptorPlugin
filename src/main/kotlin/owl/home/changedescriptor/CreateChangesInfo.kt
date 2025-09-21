@@ -11,7 +11,7 @@ import com.intellij.openapi.vcs.CheckinProjectPanel
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vcs.ui.Refreshable
-import com.intellij.ui.components.JBCheckBox
+import com.intellij.ui.components.JBRadioButton
 import com.intellij.ui.dsl.builder.Cell
 import com.intellij.ui.dsl.builder.panel
 import git4idea.branch.GitBranchUtil
@@ -25,11 +25,13 @@ class CreateChangesInfo : AnAction() {
 
         val project = e.project ?: run {
             logger.warn("No project found")
+
             return
         }
 
         val vcsPanel = e.dataContext.getData(Refreshable.PANEL_KEY) as? CheckinProjectPanel ?: run {
             logger.warn("No check-in panel found")
+
             return
         }
 
@@ -37,27 +39,29 @@ class CreateChangesInfo : AnAction() {
 
         logger.info("Change list size: ${changes.size}")
 
-        val fileNameToChangeMap = changes
+        val changesFilesCount = changes
             .filterNotNullVirtualFile()
-            .associateBy { it.virtualFile!!.name }
+            .count()
 
-        if (fileNameToChangeMap.isEmpty()) {
+        if (changesFilesCount == 0) {
             logger.info("No files to commit")
 
             return
         }
 
-        val dialog = ApproveCommitMessageTextDialog(fileNameToChangeMap.keys, project)
+        val dialog = ApproveCommitMessageTextDialog(project)
 
         if (dialog.showAndGet()) {
-            val approvedFiles = dialog.getApprovedFileNames().mapNotNull { fileNameToChangeMap[it] }
-
             val branchName = GitBranchUtil.guessWidgetRepository(project, e.dataContext)
                 ?.currentBranch
                 ?.name
                 .orEmpty()
 
-            vcsPanel.commitMessage = buildCommitMessage(branchName, approvedFiles)
+            vcsPanel.commitMessage = buildCommitMessage(
+                branchName,
+                dialog.getApprovedTrailer(),
+                changes.filterNotNullVirtualFile()
+            )
 
             logger.info("Commit message written")
         } else {
@@ -65,41 +69,33 @@ class CreateChangesInfo : AnAction() {
         }
     }
 
-    private fun Collection<Change>.filterNotNullVirtualFile(): List<Change> = filter { it.virtualFile != null }
+    private fun Collection<Change>.filterNotNullVirtualFile(): List<Change> =
+        filter { it.virtualFile != null }
 
-    private fun buildCommitMessage(branchName: String, changes: List<Change>): String {
-        val groupedChanges = changes.groupBy { it.type }
-
+    private fun buildCommitMessage(
+        branchName: String,
+        trailer: String,
+        changes: List<Change>
+    ): String {
         return buildString {
-            appendLine(branchName)
-            groupedChanges.forEach { (type, files) ->
-                appendLine("[${getProjectTypeByVcsType(type)}]:")
-                files.forEach { file ->
-                    appendLine("* ${file.virtualFile?.name}: /*Впишите сюда что именно изменилось*/")
-                }
+            appendLine("$branchName: /*Впишите сюда сообщение коммита*/")
+            appendLine("\nDetails:")
+
+            changes.forEach {
+                appendLine("${it.virtualFile?.name}: ${it.type.name}")
             }
+
+            appendLine("\nChangelog: $trailer")
         }
     }
 
-    private fun getProjectTypeByVcsType(type: Change.Type): String {
-        return when (type) {
-            Change.Type.MOVED,
-            Change.Type.MODIFICATION -> "edit"
-
-            Change.Type.NEW -> "new"
-            Change.Type.DELETED -> "delete"
-            else -> "unknown"
-        }
-    }
-
-    internal class ApproveCommitMessageTextDialog(private val commitFileNames: Set<String>, project: Project) :
-        DialogWrapper(project) {
-        private var checkBoxes: MutableList<Cell<JBCheckBox>> = mutableListOf()
+    internal class ApproveCommitMessageTextDialog(project: Project) : DialogWrapper(project) {
+        private var radios: MutableList<Cell<JBRadioButton>> = mutableListOf()
 
         init {
             isResizable = true
 
-            title = "Снимите галочки с файлов, имена которых не попадут в сообщение коммита"
+            title = "Выберите тип gitlab trailer"
 
             init()
 
@@ -108,19 +104,29 @@ class CreateChangesInfo : AnAction() {
             setCancelButtonText("Отмена")
         }
 
-        fun getApprovedFileNames(): List<String> {
-            return checkBoxes.filter { it.component.isSelected }.map { it.component.text }
+        fun getApprovedTrailer(): String {
+            return radios.first { it.component.isSelected }.component.text
         }
 
         override fun createCenterPanel(): DialogPanel = panel {
-            commitFileNames.forEach {
-                row {
-                    val checkBox = checkBox(it)
+            val trailers = mutableSetOf(
+                "added",
+                "fixed",
+                "changed",
+                "deprecated",
+                "removed",
+                "security",
+                "performance",
+                "other"
+            )
 
-                    checkBox.component.isSelected = true
-
-                    checkBoxes.add(checkBox)
-                }.resizableRow()
+            buttonsGroup(
+                "Trailers",
+                true
+            ) {
+                trailers.forEach {
+                    row { radios.add(radioButton(it)) }.resizableRow()
+                }
             }
         }
     }
